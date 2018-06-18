@@ -33,6 +33,10 @@ public class Task {
 		setUnit(unit);
 	}
 	
+	public Task(Task t) {
+		this(t.deviceTimes.get(0), t.deviceTimes.get(1), t.deviceTimes.get(2), t.index, t.unit);
+	}
+	
 	public void partDone(int partIdx) {
 		assert(partIdx >= 0 && partIdx < 3);
 		

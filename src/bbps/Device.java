@@ -18,24 +18,27 @@ public class Device {
 		setAvailable(false);
 	}
 
-	public void doWork() {
+	public void doWork(Boolean skip) {
 		if (assignedTask != null) {
 			//System.out.println(String.format("Task #%d starts on device #%d", assignedTask.getIndex(), index));
 			
 			// Simulate doing work
-			switch(assignedTask.getUnit()) {
-			case seconds:
-				try { TimeUnit.SECONDS.sleep(assignedTask.getDeviceTime(this.index)); } catch(InterruptedException e) {}
-				break;
-			case milliseconds:
-				try { TimeUnit.MILLISECONDS.sleep(assignedTask.getDeviceTime(this.index)); } catch(InterruptedException e) {}
-				break;
-			case microseconds:
-				try { TimeUnit.MICROSECONDS.sleep(assignedTask.getDeviceTime(this.index)); } catch(InterruptedException e) {}
-				break;
+			if (!skip) {
+				switch(assignedTask.getUnit()) {
+				case seconds:
+					try { TimeUnit.SECONDS.sleep(assignedTask.getDeviceTime(this.index)); } catch(InterruptedException e) {}
+					break;
+				case milliseconds:
+					try { TimeUnit.MILLISECONDS.sleep(assignedTask.getDeviceTime(this.index)); } catch(InterruptedException e) {}
+					break;
+				case microseconds:
+					try { TimeUnit.MICROSECONDS.sleep(assignedTask.getDeviceTime(this.index)); } catch(InterruptedException e) {}
+					break;
+				}
 			}
-			
-			assignedTask.partDone(this.index);
+			if (assignedTask != null) {
+				assignedTask.partDone(this.index);
+			}
 			//System.out.println(String.format("Task #%d finish on device #%d", assignedTask.getIndex(), index));
 			setAvailable(true);
 			assignedTask = null;

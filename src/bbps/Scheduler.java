@@ -201,11 +201,25 @@ public class Scheduler {
 		return gamma;
 	}
 	
+	public void reset() {
+		Vector<Task> newTasks = new Vector<Task>();
+		for (int i = 0; i < tasks.size(); i++) {
+			newTasks.add(new Task(tasks.get(i)));
+		}
+		tasks = newTasks;
+	}
+	
 	public Vector<Task> getTasks() {
 		return this.tasks;
 	}
 	
 	public Graph getGraph() {
 		return tree;
+	}
+	
+	public void setUnit(Task.Unit u) {
+		for (Task t : tasks) {
+			t.setUnit(u);
+		}
 	}
 }

@@ -4,12 +4,14 @@ import java.awt.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.Vector;
+import java.util.*;
 import java.awt.event.*;
+import java.text.*;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.*;
+import javax.swing.Timer;
 
 import bbps.Task.Unit;
 
@@ -22,6 +24,11 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	Vector<Task> work = new Vector<Task>();
 	
 	Boolean pipelineSuspend = false;
+	Boolean graphShow = false;
+	
+	Timer timer;
+	long startTime;
+	long workDuration;
 	
 	public MainFrame() {
 		Initialize();
@@ -108,19 +115,31 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			Dimension size = scrollPane.getViewport().getViewSize();
 			int x = (size.width - bounds.width) / 2;
 			scrollPane.getViewport().setViewPosition(new Point(x, 0));
+			graphShow();
+		} else if (e.getSource().equals(showGraphButton)) {
+			if (graphShow) {
+				graphHide();
+			} else {
+				graphShow();
+			}
 		} else if (e.getSource().equals(startPauseButton)) {
 			if (!pipelineSuspend) {
 				if (!pipeline.isRunning()) {
 					new Thread(new Runnable() { public void run() { pipeline.run(); }}).start();
+					startTime = Calendar.getInstance().getTimeInMillis();
 				}
 				pipeline.resume();
 				allowPipelineStop();
+				
+				timerResume();
 				
 				startPauseButton.setText("\u23F8");
 				pipelineSuspend = true;
 			} else {
 				pipeline.suspend();
 				allowPipelineStart();
+				
+				timerPause();
 				
 				startPauseButton.setText("\u25B6");
 				pipelineSuspend = false;
@@ -130,9 +149,47 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 				new Thread(new Runnable() { public void run() { pipeline.run(); }}).start();
 			}
 			pipeline.nextStep();
+			
 		} else if (e.getSource().equals(resetButton)) {
 			resetAll();
 		}
+	}
+	
+	public void graphShow() {
+		scrollPane.setVisible(true);
+		this.setSize(815, 700);
+		graphShow = true;
+	}
+	
+	public void graphHide() {
+		this.setSize(815, 310);
+		scrollPane.setVisible(false);
+		graphShow = false;
+	}
+	
+	public void timerPause() {
+		if (timer != null) {
+			this.timer.stop();
+		}
+	}
+	
+	public void timerResume() {
+		startTime = Calendar.getInstance().getTimeInMillis() - workDuration;
+	    this.timer = new Timer(1, new ActionListener() {
+			public void actionPerformed(ActionEvent ev) {
+	    		Calendar c = Calendar.getInstance();
+	    		workDuration = (long) (c.getTimeInMillis() - startTime);
+	    		timerLabel.setText("Timer: " + workDuration / 1000.0);
+	    }});
+	    this.timer.start();
+	}
+	
+	public void timerReset() {
+		if (timer != null) {
+			this.timer.stop();
+		}
+	    this.workDuration = 0;
+	    timerLabel.setText("Timer: 0.000");
 	}
 	
 	@Override
@@ -166,9 +223,8 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		taskStage2Label.setText("B");
 		taskStage3Label.setText("C");
 		
-		if (pipelineSuspend) {
-			forbidPipelineActions();
-		}
+		forbidPipelineActions();
+		timerPause();
 	}
 	
 	private void resetAll() {
@@ -177,6 +233,7 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		scheduler.reset();
 		pipeline.uploadWork(scheduler.getTasks());
 		pipelineSuspend = false;
+		timerReset();
 		allowPipelineStart();
 	}
 	
@@ -226,10 +283,10 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	JPanel controlButtonsPanel, visualizationPanel;
 	JPanel task1Panel, task2Panel, task3Panel, task4Panel, task5Panel, task6Panel;
 	JPanel pipelineStage1Panel, pipelineStage2Panel, pipelineStage3Panel;
-	JButton resetButton, enterDataButton, generateButton, startPauseButton, nextStepButton, scheduleButton;
+	JButton resetButton, enterDataButton, generateButton, startPauseButton, nextStepButton, scheduleButton, showGraphButton;
 	JComboBox<String> unitSelectComboBox;
 	JScrollPane scrollPane;
-	JLabel taskListLabel;
+	JLabel taskListLabel, timerLabel;
 	JLabel pipelineStage1Label, pipelineStage2Label, pipelineStage3Label;
 	JLabel task1NumLabel, task2NumLabel, task3NumLabel, task4NumLabel, task5NumLabel, task6NumLabel;
 	JLabel task1Label, task2Label, task3Label, task4Label, task5Label, task6Label;
@@ -470,17 +527,29 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		taskStage3Label = new JLabel("C");
 		taskStage3Label.setFont(new Font("Consolas", Font.PLAIN, 35));
 		pipelineStage3Panel.add(taskStage3Label);
-
+		
+		// timerLabel
+		timerLabel = new JLabel("Timer: 0.000");
+		timerLabel.setBounds(580, 217, 100, 20);
+		visualizationPanel.add(timerLabel);
+		
+		// showGraphButton
+		showGraphButton = new JButton("Show Graph");
+		showGraphButton.setBounds(670, 215, 120, 25);
+		showGraphButton.addActionListener(this);
+		visualizationPanel.add(showGraphButton);
+		
 		// scrollPane
 		scrollPane = new JScrollPane();
 		scrollPane.setBounds(0, 250, 800, 390);
+		scrollPane.setVisible(false);
 		scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 		scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 		scrollPane.getViewport().setBackground(Color.white);
 		this.add(scrollPane);
 		
 		// this
-		this.setSize(815, 700);
+		this.setSize(815, 310);
 		this.setLayout(new BorderLayout());
 		this.setJMenuBar(menuBar);
 		this.setTitle("BBPS (Branch and Bound Pipeline Scheduler)");

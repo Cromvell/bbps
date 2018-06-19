@@ -71,9 +71,10 @@ public class Pipeline {
 				
 				// Fire event of stage beginning
 				for (PipelineListener hl : listeners) {
-		            hl.stepPerforming();
+					hl.stepPerforming();
 				}
 				
+				// Stop pipeline condition
 				if (!isRunning || _3DevTaskIdx >= numWorks) {
 					break;
 				}

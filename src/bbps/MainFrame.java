@@ -17,7 +17,7 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	Task.Unit currentUnit = Unit.milliseconds;
 	
 	Pipeline pipeline = new Pipeline();
-	Scheduler scheduler = new Scheduler();
+	Scheduler scheduler;
 	Vector<Task> work = new Vector<Task>();
 	
 	Boolean pipelineRunning = false;
@@ -47,25 +47,32 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			System.out.println("Save schedule");
 		} else if (e.getSource().equals(exitFileMenuItem)) {  // <----- Exit program menu item
 			System.exit(0);
-		} else if (e.getSource().equals(generateButton)) {  // <----- Generate button
+		} else if (e.getSource().equals(enterDataButton)) {  // <----- Enter data button
+			enterDataButton.setEnabled(false);
+			
 			// Reset pipeline if it's running
 			if (pipeline.isEnabled()) {
 				resetAll();
 			}
 			
-			int numOfTasks = 6;
-			int maxGeneratedTime = 10;
-			scheduler.generate(numOfTasks, maxGeneratedTime);
-			scheduler.setUnit(currentUnit);
-			work = scheduler.getTasks();
-			pipeline.uploadWork(work);
-			
-			allowPipelineStart();
-			showSchedule(work);
-			scrollPane.setViewportView(null);
-			tasksEntered = true;
-		} else if (e.getSource().equals(enterDataButton)) {  // <----- Enter data button
-			new EnterDataFrame();
+			final EnterDataDialog dlg = new EnterDataDialog();
+			new Thread( new Runnable() { public void run() {
+				if (dlg.showDialogue() == 0) {
+					work = dlg.getResult();
+					
+					scheduler = new Scheduler(work);
+					scheduler.setUnit(currentUnit);
+					
+					pipeline.uploadWork(work);
+
+					allowPipelineStart();
+					showSchedule(work);
+					scrollPane.setViewportView(null);
+					tasksEntered = true;
+					
+					enterDataButton.setEnabled(true);
+				}
+			}}).start();
 		} else if (e.getSource().equals(unitSelectComboBox)) {  // <----- Select unit combo box
 			switch(unitSelectComboBox.getSelectedItem().toString()) {
 			case "seconds":
@@ -385,7 +392,7 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	JPanel controlButtonsPanel, visualizationPanel;
 	JPanel task1Panel, task2Panel, task3Panel, task4Panel, task5Panel, task6Panel;
 	JPanel pipelineStage1Panel, pipelineStage2Panel, pipelineStage3Panel;
-	JButton stopResetButton, enterDataButton, generateButton, startPauseButton, nextStepButton, scheduleButton, showGraphButton;
+	JButton stopResetButton, enterDataButton, startPauseButton, nextStepButton, scheduleButton, showGraphButton;
 	JComboBox<String> unitSelectComboBox;
 	JScrollPane scrollPane;
 	JLabel taskListLabel, timerLabel;
@@ -427,11 +434,6 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		controlButtonsPanel = new JPanel();
 		controlButtonsPanel.setSize(800, 40);
 		simulatorPanel.add(controlButtonsPanel);
-
-		// generateButton
-		generateButton = new JButton("Generate");
-		generateButton.addActionListener(this);
-		controlButtonsPanel.add(generateButton);
 		
 		// enterDataButton
 		enterDataButton = new JButton("Enter data");

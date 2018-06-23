@@ -18,21 +18,6 @@ public class Scheduler {
 		this.taskNumber = work.size();
 	}
 	
-	public void generate(int numTasks, int maxGenNum)
-	{
-		tasks = new Vector<Task>();
-		Random rnd = new Random();
-		
-		for (int i = 0; i < numTasks; i++) {
-			int tA = rnd.nextInt(maxGenNum);
-			int tB = rnd.nextInt(maxGenNum);
-			int tC = rnd.nextInt(maxGenNum);
-			tasks.add(new Task(tA, tB, tC, i));
-		}
-		taskNumber = numTasks;
-		scheduleCompose = false;
-	}
-	
 	public void composeSchedule() {
 		if (tasks != null && !scheduleCompose) {
 			Vector<Task> newSchedule = new Vector<Task>();

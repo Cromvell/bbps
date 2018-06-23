@@ -81,10 +81,10 @@ public class Pipeline {
 				}
 				
 				// Wait for all devices complete its work
-				while (enabled && !suspended && (!d1.isAvailable() || !d2.isAvailable() || !d3.isAvailable())) try { TimeUnit.MILLISECONDS.sleep(1); } catch (InterruptedException e) {};
+				while (enabled && !suspended && (!d1.isAvailable() || !d2.isAvailable() || !d3.isAvailable())) try { TimeUnit.MICROSECONDS.sleep(1); } catch (InterruptedException e) {};
 				
 				// Wait if pipeline suspended
-				while (enabled && suspended) try { TimeUnit.MILLISECONDS.sleep(1); } catch (InterruptedException e) {};
+				while (enabled && suspended) try { TimeUnit.MICROSECONDS.sleep(1); } catch (InterruptedException e) {};
 			}
 			
 			// Fire event of complete work

@@ -2,29 +2,27 @@ package bbps;
 
 import java.awt.*;
 import java.awt.geom.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.*;
 import java.awt.event.*;
 import java.text.*;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
-import javax.swing.event.*;
 import javax.swing.Timer;
 
 import bbps.Task.Unit;
 
 public class MainFrame extends JFrame implements ActionListener, PipelineListener {
-	
+
 	Task.Unit currentUnit = Unit.milliseconds;
 	
 	Pipeline pipeline = new Pipeline();
 	Scheduler scheduler = new Scheduler();
 	Vector<Task> work = new Vector<Task>();
 	
-	Boolean pipelineSuspend = false;
+	Boolean pipelineRunning = false;
 	Boolean graphShow = false;
+	Boolean tasksEntered = false;
 	
 	Timer timer;
 	long startTime;
@@ -34,18 +32,6 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		Initialize();
 		
 		pipeline.addListener(this);
-		/*
-		Vector<Task> t = new Vector<Task>();
-		t.add(new Task(0, 0, 0));
-		t.add(new Task(0, 0, 0));
-		t.add(new Task(0, 0, 0));
-		t.add(new Task(0, 0, 0));
-		t.add(new Task(0, 0, 0));
-		t.add(new Task(0, 0, 0));
-		
-		scheduler = new Scheduler(t);
-		scheduler.composeSchedule();
-		pipeline = new Pipeline(t);*/
 	}
 	
 	////////////////////////////////////
@@ -55,15 +41,15 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	
 	@Override
 	public void actionPerformed(ActionEvent e) {
-		if (e.getSource().equals(openFileMenuItem)) {
-			System.out.println("Open file");
-		} else if (e.getSource().equals(saveFileMenuItem)) {
-			System.out.println("Save file");
-		} else if (e.getSource().equals(exitFileMenuItem)) {
+		if (e.getSource().equals(openFileMenuItem)) {  // <----- Open file menu item
+			System.out.println("Open schedule");
+		} else if (e.getSource().equals(saveFileMenuItem)) {  // <----- Save file menu item
+			System.out.println("Save schedule");
+		} else if (e.getSource().equals(exitFileMenuItem)) {  // <----- Exit program menu item
 			System.exit(0);
-		} else if (e.getSource().equals(generateButton)) {
+		} else if (e.getSource().equals(generateButton)) {  // <----- Generate button
 			// Reset pipeline if it's running
-			if (pipeline.isRunning()) {
+			if (pipeline.isEnabled()) {
 				resetAll();
 			}
 			
@@ -77,7 +63,10 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			allowPipelineStart();
 			showSchedule(work);
 			scrollPane.setViewportView(null);
-		} else if (e.getSource().equals(unitSelectComboBox)) {
+			tasksEntered = true;
+		} else if (e.getSource().equals(enterDataButton)) {  // <----- Enter data button
+			new EnterDataFrame();
+		} else if (e.getSource().equals(unitSelectComboBox)) {  // <----- Select unit combo box
 			switch(unitSelectComboBox.getSelectedItem().toString()) {
 			case "seconds":
 				currentUnit = Task.Unit.seconds;
@@ -91,14 +80,16 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			}
 			
 			// Reset pipeline if it's running
-			if (pipeline.isRunning()) {
+			if (pipeline.isEnabled()) {
 				resetAll();
 			}
 			
-			scheduler.setUnit(currentUnit);
-		} else if (e.getSource().equals(scheduleButton)) {
+			if (tasksEntered) {
+				scheduler.setUnit(currentUnit);
+			}
+		} else if (e.getSource().equals(scheduleButton)) {  // <----- Compose schedule button
 			// Reset pipeline if it's running
-			if (pipeline.isRunning()) {
+			if (pipeline.isEnabled()) {
 				resetAll();
 			}
 			
@@ -107,24 +98,60 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			pipeline.uploadWork(work);
 			showSchedule(work);
 			
-			// Draw Graph
-			scrollPane.setViewportView(new JLabel(new ImageIcon(scheduler.getGraph().getGraphImage())));
+			// Create label, that contains graph and add mouse listener for dragging image
+			final JLabel graph = new JLabel(new ImageIcon(scheduler.getGraph().getGraphImage()));
+			MouseAdapter ma = new MouseAdapter() {
+
+                private Point origin;
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    origin = new Point(e.getPoint());
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                }
+
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    if (origin != null) {
+                        JViewport viewPort = (JViewport) SwingUtilities.getAncestorOfClass(JViewport.class, graph);
+                        if (viewPort != null) {
+                            int deltaX = origin.x - e.getX();
+                            int deltaY = origin.y - e.getY();
+
+                            Rectangle view = viewPort.getViewRect();
+                            view.x += deltaX;
+                            view.y += deltaY;
+
+                            graph.scrollRectToVisible(view);
+                        }
+                    }
+                }
+
+            };
+            graph.addMouseListener(ma);
+            graph.addMouseMotionListener(ma);
+			
+			// Display Graph
+			scrollPane.setViewportView(graph);
 			
 			// Set viewport position to center
 			Rectangle bounds = scrollPane.getViewport().getViewRect();
 			Dimension size = scrollPane.getViewport().getViewSize();
-			int x = (size.width - bounds.width) / 2;
-			scrollPane.getViewport().setViewPosition(new Point(x, 0));
+			int hostCenterX = (size.width - bounds.width) / 2;
+			scrollPane.getViewport().setViewPosition(new Point(hostCenterX, 0));
 			graphShow();
-		} else if (e.getSource().equals(showGraphButton)) {
+		} else if (e.getSource().equals(showGraphButton)) {  // <----- Show graph button
 			if (graphShow) {
 				graphHide();
 			} else {
 				graphShow();
 			}
-		} else if (e.getSource().equals(startPauseButton)) {
-			if (!pipelineSuspend) {
-				if (!pipeline.isRunning()) {
+		} else if (e.getSource().equals(startPauseButton)) {  // <----- Start/Pause button
+			if (!pipelineRunning) {
+				if (!pipeline.isEnabled()) {
 					new Thread(new Runnable() { public void run() { pipeline.run(); }}).start();
 					startTime = Calendar.getInstance().getTimeInMillis();
 				}
@@ -133,24 +160,26 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 				
 				timerResume();
 				
+				stopResetButton.setText("Stop");
 				startPauseButton.setText("\u23F8");
-				pipelineSuspend = true;
+				pipelineRunning = true;
 			} else {
 				pipeline.suspend();
 				allowPipelineStart();
 				
 				timerPause();
 				
+				stopResetButton.setText("Reset");
 				startPauseButton.setText("\u25B6");
-				pipelineSuspend = false;
+				pipelineRunning = false;
 			}
-		} else if (e.getSource().equals(nextStepButton)) {
-			if (!pipeline.isRunning()) {
+		} else if (e.getSource().equals(nextStepButton)) {  // <----- Next step button
+			if (!pipeline.isEnabled()) {
 				new Thread(new Runnable() { public void run() { pipeline.run(); }}).start();
 			}
 			pipeline.nextStep();
 			
-		} else if (e.getSource().equals(resetButton)) {
+		} else if (e.getSource().equals(stopResetButton)) {  // <----- Stop/Reset button
 			resetAll();
 		}
 	}
@@ -215,6 +244,74 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		} else {
 			taskStage3Label.setText("C");
 		}
+		
+		clearAllPanelTask();
+		
+		Color darkGreen = new Color(0, 184, 0);
+		setPanelTaskColor(_1DevTaskIdx, Color.RED);
+		setPanelTaskColor(_2DevTaskIdx, darkGreen);
+		setPanelTaskColor(_3DevTaskIdx, Color.BLUE);
+	}
+	
+	private void setPanelTaskColor(int taskIdx, Color col) {
+		switch (taskIdx) {
+		case 0:
+			task1Panel.setBackground(col);
+			task1Label.setForeground(Color.WHITE);
+			break;
+		case 1:
+			task2Panel.setBackground(col);
+			task2Label.setForeground(Color.WHITE);
+			break;
+		case 2:
+			task3Panel.setBackground(col);
+			task3Label.setForeground(Color.WHITE);
+			break;
+		case 3:
+			task4Panel.setBackground(col);
+			task4Label.setForeground(Color.WHITE);
+			break;
+		case 4:
+			task5Panel.setBackground(col);
+			task5Label.setForeground(Color.WHITE);
+			break;
+		case 5:
+			task6Panel.setBackground(col);
+			task6Label.setForeground(Color.WHITE);
+			break;
+		}
+	}
+	
+	private void clearAllPanelTask() {
+		int taskNumber = 6;
+		for (int i = 0; i < taskNumber; i++) {
+			switch (i) {
+			case 0:
+				task1Panel.setBackground(Color.WHITE);
+				task1Label.setForeground(Color.BLACK);
+				break;
+			case 1:
+				task2Panel.setBackground(Color.WHITE);
+				task2Label.setForeground(Color.BLACK);
+				break;
+			case 2:
+				task3Panel.setBackground(Color.WHITE);
+				task3Label.setForeground(Color.BLACK);
+				break;
+			case 3:
+				task4Panel.setBackground(Color.WHITE);
+				task4Label.setForeground(Color.BLACK);
+				break;
+			case 4:
+				task5Panel.setBackground(Color.WHITE);
+				task5Label.setForeground(Color.BLACK);
+				break;
+			case 5:
+				task6Panel.setBackground(Color.WHITE);
+				task6Label.setForeground(Color.BLACK);
+				break;
+			}
+		}
 	}
 	
 	@Override
@@ -222,6 +319,8 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		taskStage1Label.setText("A");
 		taskStage2Label.setText("B");
 		taskStage3Label.setText("C");
+		stopResetButton.setText("Reset");
+		clearAllPanelTask();
 		
 		forbidPipelineActions();
 		timerPause();
@@ -232,8 +331,11 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		pipeline.reset();
 		scheduler.reset();
 		pipeline.uploadWork(scheduler.getTasks());
-		pipelineSuspend = false;
+		pipelineRunning = false;
+
+		stopResetButton.setText("Reset");
 		timerReset();
+		clearAllPanelTask();
 		allowPipelineStart();
 	}
 	
@@ -257,7 +359,7 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		scheduleButton.setEnabled(true);
 		startPauseButton.setEnabled(true);
 		nextStepButton.setEnabled(true);
-		resetButton.setEnabled(true);
+		stopResetButton.setEnabled(true);
 
 		startPauseButton.setText("\u25B6");
 	}
@@ -283,7 +385,7 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	JPanel controlButtonsPanel, visualizationPanel;
 	JPanel task1Panel, task2Panel, task3Panel, task4Panel, task5Panel, task6Panel;
 	JPanel pipelineStage1Panel, pipelineStage2Panel, pipelineStage3Panel;
-	JButton resetButton, enterDataButton, generateButton, startPauseButton, nextStepButton, scheduleButton, showGraphButton;
+	JButton stopResetButton, enterDataButton, generateButton, startPauseButton, nextStepButton, scheduleButton, showGraphButton;
 	JComboBox<String> unitSelectComboBox;
 	JScrollPane scrollPane;
 	JLabel taskListLabel, timerLabel;
@@ -301,12 +403,12 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		menuBar.add(fileMenu);
 		
 		// openFileMenuItem
-		openFileMenuItem = new JMenuItem("Open file");
+		openFileMenuItem = new JMenuItem("Open schedule");
 		openFileMenuItem.addActionListener(this);
 		fileMenu.add(openFileMenuItem);
 		
 		// saveFileMenuItem
-		saveFileMenuItem = new JMenuItem("Save file");
+		saveFileMenuItem = new JMenuItem("Save schedule");
 		saveFileMenuItem.addActionListener(this);
 		fileMenu.add(saveFileMenuItem);
 		
@@ -365,10 +467,10 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		controlButtonsPanel.add(nextStepButton);
 		
 		// resetButton	
-		resetButton = new JButton("Reset");
-		resetButton.addActionListener(this);
-		resetButton.setEnabled(false);
-		controlButtonsPanel.add(resetButton);
+		stopResetButton = new JButton("Reset");
+		stopResetButton.addActionListener(this);
+		stopResetButton.setEnabled(false);
+		controlButtonsPanel.add(stopResetButton);
 		
 		// visualizationPanel
 		visualizationPanel = new JPanel();
@@ -501,16 +603,19 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		// pipelineStage1Label
 		pipelineStage1Label = new JLabel("Stage 1");
 		pipelineStage1Label.setBounds(300, 80, 50, 20);
+		pipelineStage1Label.setForeground(Color.RED);
 		visualizationPanel.add(pipelineStage1Label);
 		
 		// pipelineStage2Label
 		pipelineStage2Label = new JLabel("Stage 2");
 		pipelineStage2Label.setBounds(400, 80, 50, 20);
+		pipelineStage2Label.setForeground(new Color(0, 184, 0));
 		visualizationPanel.add(pipelineStage2Label);
 		
 		// pipelineStage3Label
 		pipelineStage3Label = new JLabel("Stage 3");
 		pipelineStage3Label.setBounds(500, 80, 50, 20);
+		pipelineStage3Label.setForeground(Color.BLUE);
 		visualizationPanel.add(pipelineStage3Label);
 		
 		// taskStage1Label
@@ -546,10 +651,13 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 		scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 		scrollPane.getViewport().setBackground(Color.white);
+		scrollPane.setCursor(new Cursor(Cursor.MOVE_CURSOR));
 		this.add(scrollPane);
 		
 		// this
+		Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
 		this.setSize(815, 310);
+		this.setLocation(dim.width/2-this.getSize().width/2, dim.height/2-this.getSize().height/2-200);
 		this.setLayout(new BorderLayout());
 		this.setJMenuBar(menuBar);
 		this.setTitle("BBPS (Branch and Bound Pipeline Scheduler)");

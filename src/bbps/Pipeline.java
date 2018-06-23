@@ -10,9 +10,9 @@ public class Pipeline {
 	private int _3DevTaskIdx;
 	private Vector<Task> assignWork = null;
 	
-	private Boolean isRunning = false;
-	private Boolean isSuspend = false;
-	private Boolean isNextStep = false;
+	private Boolean enabled = false;
+	private Boolean suspended = false;
+	private Boolean stepMode = false;
 	
 	private List<PipelineListener> listeners = new ArrayList<PipelineListener>();
 	
@@ -33,15 +33,15 @@ public class Pipeline {
 	}
 	
 	public void run() {
-		if (assignWork != null && !isRunning) {
+		if (assignWork != null && !enabled) {
 			final Device d1 = devices.get(0);
 			final Device d2 = devices.get(1);
 			final Device d3 = devices.get(2);
 			int numWorks = assignWork.size();
 			
-			isRunning = true;
+			enabled = true;
 			
-			for (int i = 0; !assignWork.get(numWorks - 1).isDone(); i++) {
+			for (int i = 0; assignWork != null && !assignWork.get(numWorks - 1).isDone(); i++) {
 				
 				// Set task indexes with offsets for each device(stage)
 				_1DevTaskIdx = i;
@@ -51,21 +51,22 @@ public class Pipeline {
 				// Run each device on independent thread
 				if (_1DevTaskIdx >= 0 &&_1DevTaskIdx < numWorks && assignWork != null) {
 					d1.uploadWork(assignWork.get(_1DevTaskIdx));
-					new Thread(new Runnable() { public void run() { d1.doWork(isNextStep); } }).start();
+					new Thread(new Runnable() { public void run() { d1.doWork(stepMode); } }).start();
 				}
 				if (_2DevTaskIdx >= 0 && _2DevTaskIdx < numWorks && assignWork != null) {
 					d2.uploadWork(assignWork.get(_2DevTaskIdx));
-					new Thread(new Runnable() { public void run() { d2.doWork(isNextStep); } }).start();
+					new Thread(new Runnable() { public void run() { d2.doWork(stepMode); } }).start();
 				}
 				if (_3DevTaskIdx >= 0 && _3DevTaskIdx < numWorks && assignWork != null) {
 					d3.uploadWork(assignWork.get(_3DevTaskIdx));
-					new Thread(new Runnable() { public void run() { d3.doWork(isNextStep); } }).start();
+					new Thread(new Runnable() { public void run() { d3.doWork(stepMode); } }).start();
 				}
 				
-				if (isNextStep && !isSuspend) {
-					isSuspend = true;
+				// Step mode act
+				if (stepMode && !suspended) {
+					suspended = true;
 				}
-				isNextStep = false;
+				stepMode = false;
 				
 				//System.out.println(String.format("Pipeline:  %d  %d  %d", _1DevTaskIdx, _2DevTaskIdx, _3DevTaskIdx));
 				
@@ -75,46 +76,46 @@ public class Pipeline {
 				}
 				
 				// Stop pipeline condition
-				if (!isRunning || _3DevTaskIdx >= numWorks) {
+				if (!enabled || _3DevTaskIdx >= numWorks) {
 					break;
 				}
 				
 				// Wait for all devices complete its work
-				while (isRunning && !isSuspend && (!d1.isAvailable() || !d2.isAvailable() || !d3.isAvailable())) try { TimeUnit.MILLISECONDS.sleep(1); } catch (InterruptedException e) {};
+				while (enabled && !suspended && (!d1.isAvailable() || !d2.isAvailable() || !d3.isAvailable())) try { TimeUnit.MILLISECONDS.sleep(1); } catch (InterruptedException e) {};
 				
 				// Wait if pipeline suspended
-				while (isRunning && isSuspend) try { TimeUnit.MILLISECONDS.sleep(1); } catch (InterruptedException e) {};
+				while (enabled && suspended) try { TimeUnit.MILLISECONDS.sleep(1); } catch (InterruptedException e) {};
 			}
 			
 			// Fire event of complete work
 			for (PipelineListener hl : listeners) {
 				hl.workDone();
 			}
-			isRunning = false;
+			enabled = false;
 		}
 	}
 	
 	public void stop() {
-		isRunning = false;
+		enabled = false;
 	}
 	
 	public void nextStep() {
-		isNextStep = true;
-		isSuspend = false;
+		stepMode = true;
+		suspended = false;
 	}
 	
 	public void suspend() {
-		isSuspend = true;
+		suspended = true;
 	}
 	
 	public void resume() {
-		isSuspend = false;
+		suspended = false;
 	}
 	
 	public void reset() {
-		isRunning = false;
-		isSuspend = false;
-		isNextStep = false;
+		enabled = false;
+		suspended = false;
+		stepMode = false;
 		
 		assignWork = null;
 	}
@@ -151,7 +152,7 @@ public class Pipeline {
 		}
 	}
 	
-	public Boolean isRunning() {
-		return this.isRunning;
+	public Boolean isEnabled() {
+		return this.enabled;
 	}
 }

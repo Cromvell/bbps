@@ -9,6 +9,11 @@ import java.util.concurrent.TimeUnit;
 
 public class EnterDataDialog extends JDialog implements ActionListener {
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+	
 	private Boolean dataReady = false;
 	private Vector<Task> result;
 	

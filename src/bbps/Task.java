@@ -33,7 +33,11 @@ public class Task {
 		setUnit(unit);
 	}
 	
-	public Task(Task t) {
+	public Task(int[] devT, int index) {
+		this(devT[0], devT[1], devT[2], index);
+	}
+	
+	public Task(final Task t) {
 		this(t.deviceTimes.get(0), t.deviceTimes.get(1), t.deviceTimes.get(2), t.index, t.unit);
 	}
 	
@@ -54,6 +58,10 @@ public class Task {
 	public String toBigString() {
 		return String.format("(%d, %d, %d)", getDeviceTime(0), getDeviceTime(1), getDeviceTime(2));
 	}
+	
+	public int[] toArray() {
+		return new int[] { getDeviceTime(0), getDeviceTime(1), getDeviceTime(2) }; 
+	}
 
 	public int getIndex() {
 		return index;
@@ -67,10 +75,6 @@ public class Task {
 		assert(deviceIndex >= 0 && deviceIndex < 3);
 		
 		return deviceTimes.get(deviceIndex);
-	}
-	
-	private void setDeviceTime(int deviceIndex, int value) {
-		this.deviceTimes.set(deviceIndex, value);
 	}
 
 	public boolean isDone() {

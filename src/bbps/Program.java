@@ -1,7 +1,5 @@
 package bbps;
 
-import java.util.Vector;
-
 import javax.swing.*;
 
 public class Program {

@@ -2,18 +2,23 @@ package bbps;
 
 import java.awt.*;
 import java.awt.geom.*;
-import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.nio.file.Files;
 import java.util.*;
 import java.awt.event.*;
-import java.text.*;
 
 import javax.swing.*;
 import javax.swing.Timer;
 
 import bbps.Task.Unit;
 
-public class MainFrame extends JFrame implements ActionListener, PipelineListener {
+import org.json.*;
 
+public class MainFrame extends JFrame implements ActionListener, PipelineListener {
+	
 	Task.Unit currentUnit = Unit.milliseconds;
 	
 	Pipeline pipeline = new Pipeline();
@@ -42,12 +47,87 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	@Override
 	public void actionPerformed(ActionEvent e) {
 		if (e.getSource().equals(openFileMenuItem)) {  // <----- Open file menu item
-			System.out.println("Open schedule");
+			
+			// Reset pipeline if it's running
+			if (pipeline.isEnabled()) {
+				resetAll();
+			}
+			
+			final JFileChooser fc = new JFileChooser();
+			
+			if (fc.showOpenDialog(MainFrame.this) == 0) {
+				final ArrayList<String> lines;
+				try {
+					// File reading
+					lines = (ArrayList<String>) Files.readAllLines(fc.getSelectedFile().toPath());
+					
+					String fileContent = "";
+					for (String l : lines) {
+						fileContent += l;
+					}
+					
+					// Parse file content
+					JSONObject jsonObj = new JSONObject(fileContent);
+					
+					// Convert JSONObject to List<Task>
+					int taskNumber = 6;
+					int devNumber = 3;
+					Vector<Task> tasks = new Vector<Task>();
+					for (int i = 0; i < taskNumber; i++) {
+						JSONObject currJsonObj = jsonObj.getJSONObject("" + i);
+						
+						int taskIdx = currJsonObj.getInt("taskIdx");
+						int devTimesArr[] = new int[3];
+						for (int j = 0; j < devNumber; j++) {
+							devTimesArr[j] = (int) currJsonObj.getJSONArray("deviceTimes").get(j);
+						}
+						tasks.add(new Task(devTimesArr, taskIdx));
+					}
+					
+					setUpWork(tasks);
+					
+				} catch (IOException e0) {
+					JOptionPane.showMessageDialog(new JFrame(), "Error while reading file occur.");
+				} catch (JSONException e1) {
+					JOptionPane.showMessageDialog(new JFrame(), "Error while parsing JSON occur.");
+				}
+			}
+			
 		} else if (e.getSource().equals(saveFileMenuItem)) {  // <----- Save file menu item
-			System.out.println("Save schedule");
+			
+			final JFileChooser fc = new JFileChooser();
+			
+			if (fc.showSaveDialog(MainFrame.this) == 0) {
+				JSONObject jsonObj = new JSONObject();
+				try {
+					// Convert Vector<Task> to JSONObject
+					int taskNumber = 6;
+					for (int i = 0; i < taskNumber; i++) {
+						JSONObject currTaskObj = new JSONObject();
+						
+						currTaskObj.put("taskIdx", work.get(i).getIndex());
+						currTaskObj.put("deviceTimes", work.get(i).toArray());
+						
+						jsonObj.put("" + i, currTaskObj);
+					}
+					
+					// Write file
+					PrintWriter writer = new PrintWriter(fc.getSelectedFile(), "UTF-8");
+					writer.print(jsonObj.toString());
+					writer.close();	
+				} catch (FileNotFoundException | UnsupportedEncodingException e1) {
+					JOptionPane.showMessageDialog(new JFrame(), "Error while writing file occur.");
+				} catch (JSONException e2) {
+					JOptionPane.showMessageDialog(new JFrame(), "Error while converting JSON occur.");
+				}
+			}
+			
 		} else if (e.getSource().equals(exitFileMenuItem)) {  // <----- Exit program menu item
+			
 			System.exit(0);
+			
 		} else if (e.getSource().equals(enterDataButton)) {  // <----- Enter data button
+			
 			enterDataButton.setEnabled(false);
 			
 			// Reset pipeline if it's running
@@ -55,25 +135,17 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 				resetAll();
 			}
 			
+			// TODO: Create adequate dialog
 			final EnterDataDialog dlg = new EnterDataDialog();
 			new Thread( new Runnable() { public void run() {
 				if (dlg.showDialogue() == 0) {
-					work = dlg.getResult();
-					
-					scheduler = new Scheduler(work);
-					scheduler.setUnit(currentUnit);
-					
-					pipeline.uploadWork(work);
-
-					allowPipelineStart();
-					showSchedule(work);
-					scrollPane.setViewportView(null);
-					tasksEntered = true;
-					
-					enterDataButton.setEnabled(true);
+					setUpWork(dlg.getResult());
 				}
+				enterDataButton.setEnabled(true);
 			}}).start();
+			
 		} else if (e.getSource().equals(unitSelectComboBox)) {  // <----- Select unit combo box
+			
 			switch(unitSelectComboBox.getSelectedItem().toString()) {
 			case "seconds":
 				currentUnit = Task.Unit.seconds;
@@ -94,7 +166,9 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			if (tasksEntered) {
 				scheduler.setUnit(currentUnit);
 			}
+			
 		} else if (e.getSource().equals(scheduleButton)) {  // <----- Compose schedule button
+			
 			// Reset pipeline if it's running
 			if (pipeline.isEnabled()) {
 				resetAll();
@@ -150,14 +224,19 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			int hostCenterX = (size.width - bounds.width) / 2;
 			scrollPane.getViewport().setViewPosition(new Point(hostCenterX, 0));
 			graphShow();
+			
 		} else if (e.getSource().equals(showGraphButton)) {  // <----- Show graph button
+			
 			if (graphShow) {
 				graphHide();
 			} else {
 				graphShow();
 			}
+			
 		} else if (e.getSource().equals(startPauseButton)) {  // <----- Start/Pause button
+			
 			if (!pipelineRunning) {
+				// If pipeline not running yet start it
 				if (!pipeline.isEnabled()) {
 					new Thread(new Runnable() { public void run() { pipeline.run(); }}).start();
 					startTime = Calendar.getInstance().getTimeInMillis();
@@ -180,14 +259,19 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 				startPauseButton.setText("\u25B6");
 				pipelineRunning = false;
 			}
+			
 		} else if (e.getSource().equals(nextStepButton)) {  // <----- Next step button
+			
+			// If pipeline not running yet start it
 			if (!pipeline.isEnabled()) {
 				new Thread(new Runnable() { public void run() { pipeline.run(); }}).start();
 			}
 			pipeline.nextStep();
 			
 		} else if (e.getSource().equals(stopResetButton)) {  // <----- Stop/Reset button
+			
 			resetAll();
+			
 		}
 	}
 	
@@ -205,26 +289,30 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 	
 	public void timerPause() {
 		if (timer != null) {
-			this.timer.stop();
+			timer.stop();
 		}
 	}
 	
 	public void timerResume() {
+		// Set support time for saving timer value while pipeline suspended
 		startTime = Calendar.getInstance().getTimeInMillis() - workDuration;
-	    this.timer = new Timer(1, new ActionListener() {
+		
+	    timer = new Timer(1, new ActionListener() {
 			public void actionPerformed(ActionEvent ev) {
 	    		Calendar c = Calendar.getInstance();
+	    		
+	    		// Change total duration of work while pipeline moving
 	    		workDuration = (long) (c.getTimeInMillis() - startTime);
 	    		timerLabel.setText("Timer: " + workDuration / 1000.0);
 	    }});
-	    this.timer.start();
+	    timer.start();
 	}
 	
 	public void timerReset() {
 		if (timer != null) {
-			this.timer.stop();
+			timer.stop();
 		}
-	    this.workDuration = 0;
+	    workDuration = 0;
 	    timerLabel.setText("Timer: 0.000");
 	}
 	
@@ -333,6 +421,21 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		timerPause();
 	}
 	
+	private void setUpWork(Vector<Task> w) {
+		this.work = w;
+		
+		scheduler = new Scheduler(work);
+		scheduler.setUnit(currentUnit);
+		
+		pipeline.uploadWork(work);
+
+		allowPipelineStart();
+		showSchedule(work);
+		scrollPane.setViewportView(null);
+		saveFileMenuItem.setEnabled(true);
+		tasksEntered = true;
+	}
+	
 	private void resetAll() {
 		pipeline.stop();
 		pipeline.reset();
@@ -417,6 +520,7 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 		// saveFileMenuItem
 		saveFileMenuItem = new JMenuItem("Save schedule");
 		saveFileMenuItem.addActionListener(this);
+		saveFileMenuItem.setEnabled(false);
 		fileMenu.add(saveFileMenuItem);
 		
 		// exitFileMenuItem

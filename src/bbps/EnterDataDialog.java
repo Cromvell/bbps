@@ -199,7 +199,7 @@ public class EnterDataDialog extends JDialog implements ActionListener {
 		
 		// this
 		Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
-		this.setSize(200, 235);
+		this.setSize(190, 235);
 		this.setTitle("Enter data");
 		this.setLocation(dim.width/2-this.getSize().width/2, dim.height/2-this.getSize().height/2);
 		this.setLayout(new FlowLayout());

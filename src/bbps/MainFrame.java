@@ -136,13 +136,19 @@ public class MainFrame extends JFrame implements ActionListener, PipelineListene
 			}
 			
 			// TODO: Create adequate dialog
-			final EnterDataDialog dlg = new EnterDataDialog();
-			new Thread( new Runnable() { public void run() {
-				if (dlg.showDialogue() == 0) {
-					setUpWork(dlg.getResult());
-				}
+			try
+			{
+				final EnterDataDialog dlg = new EnterDataDialog();
+				new Thread( new Runnable() { public void run() {
+					if (dlg.showDialogue() == 0) {
+						setUpWork(dlg.getResult());
+					}
+					enterDataButton.setEnabled(true);
+				}}).start();
+			} catch (Exception ex) {		
+			} finally {
 				enterDataButton.setEnabled(true);
-			}}).start();
+			}
 			
 		} else if (e.getSource().equals(unitSelectComboBox)) {  // <----- Select unit combo box
 			
